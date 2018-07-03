@@ -15,7 +15,8 @@ class Servidor:
 		self.port = port
 		self.palavras_reservadas = ['/tchau', '/lista', '/SERVIDOR_OFF', '/apelido']
 		self.clientes = {} #key: apelido. Value: (con, idm)
-        
+		with open('token.txt', 'r') as myfile:
+			self.token=myfile.read().replace('\n', '')
         
 	def main(self):
 		'''Começa a execução do servidor, aqui as threads são inicializadas e enviadas aos respectivos métodos'''
