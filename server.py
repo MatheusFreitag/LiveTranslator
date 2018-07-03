@@ -14,7 +14,7 @@ class Servidor:
 		self.host = host
 		self.port = port
 		self.palavras_reservadas = ['/tchau', '/lista', '/SERVIDOR_OFF', '/apelido']
-		self.clientes = {} #key: apelido. Value: (con)
+		self.clientes = {} #key: apelido. Value: (con, idm)
         
         
 	def main(self):
@@ -61,11 +61,14 @@ class Servidor:
 			con.send('Este apelido já está sendo usado. Tente outro apelido:'.encode('utf-8'))
 			apelido = con.recv(1024).decode('utf-8')
 			existe = self.verifica_apelido(apelido)
+		
+		con.send('Em qual idioma você gostaria de receber as mensagems? (PT, EN, ES):'.encode('utf-8'))
+		idioma = con.recv(1024).decode('utf-8')
+		
+		print("{} conectou-se ao bate-papo LiveTranslator e fala {}.".format(apelido, idioma))
 
-		print("{} conectou-se ao bate-papo LiveTranslator.".format(apelido))
-
-		#key: apelido. Value: (con)
-		self.clientes[apelido] = (con)		
+		#key: apelido. Value: (con, idioma)
+		self.clientes[apelido] = (con, idioma)		
 
 		msg = '{} entrou no bate-papo.'.format(apelido)
 		self.envia_mensagem_publica(apelido, msg)
@@ -76,10 +79,11 @@ class Servidor:
 		'''Envia mensagens para todos os clientes.'''
 
 		for apelido, value in list(self.clientes.items()):
-			conn = value
+			con, idm = value
 			#Verifica que o usuario que irá receber a mensagem não é o mesmo que envia a mensagem.
 			if apelido != remetente:
-				self.envio_mensagem(conn, msg)
+				msg = msg + "[Em {}]".format(idm)
+				self.envio_mensagem(con, msg)
 	
 		if not self.clientes: #Servidor vai fechar e não tem ninguém conectado
 			return
@@ -118,11 +122,12 @@ class Servidor:
         
         
 	def comando_msg(self, remetente, msg):
-		'''Verifica se a mensagem enviada é um comando/regra ou se é mensagem pública.
+		'''Verifica se a mensagem enviada é um comando ou se é mensagem pública.
 		Lista de comandos:
 		/tchau				#Cliente encerra conexão com servidor
 		/lista				#Mosta uma lista com todos os usuários do chat
-		/apelido 			#Cliente manda mensagem privada para fulado que tem o nome escrito em apelido'''
+		/apelido 			#Cliente manda mensagem privada para usuario definido por APELIDO
+		'''
 	
 		is_comando = msg.strip() #Tira espaços em branco no início e fim da mensagem
 		is_comando = list(is_comando) #Coloca numa lista todas as letras da mensagem
@@ -167,7 +172,7 @@ class Servidor:
 	def fim_conexao(self, apelido):
 		'''Esse método é chamado internamente pela encerrar conexão de um cliente.'''
 		#Pega conexão que será encerrada
-		con = self.clientes.get(apelido)
+		con,idm = self.clientes.get(apelido)
 		
 		#Remove do dicionário
 		del self.clientes[apelido]
@@ -187,13 +192,14 @@ class Servidor:
 		
 	def envia_mensagem_privada(self, remetente, destinatario, msg):
 		'''Envia mensagem de um cliente para um único usuário'''
-		con = self.clientes.get(destinatario)
+		con, idm = self.clientes.get(destinatario)
 		if remetente == []:
 			remetente = "Servidor"
 		
 		#Envia mensagem privada
-		msg = '<' + remetente + '> <Privado> ' + msg
+		msg = '<' + remetente + '> <Privado> ' + msg + "[Enviada em {}]".format(idm)
 		self.envio_mensagem(con, msg)
+		
 		
 		
 if __name__ == "__main__":
