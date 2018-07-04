@@ -66,12 +66,17 @@ class Servidor:
 		    'Text' : text,
 		}]
 
-		content = json.dumps(requestBody, ensure_ascii=False)
+		content = json.dumps(requestBody, ensure_ascii=False).encode('utf-8')
 		result = translate (content) #Array de bytes
 		result = result.decode('utf8').replace("'", '"').replace("[", "").replace("]", "") # Lista com caracteres retornados tratados
 		result = json.loads(result) #Json tratado
-
-		return (result["translations"]["text"])
+		# print('-'*7)
+		# print(content)
+		# print(result)
+		if (result["translations"]["text"]):
+			return (result["translations"]["text"])
+		else:
+			return "Falha de tradução"
 		
 		
 	def aceita_conexao_clientes(self):
@@ -95,7 +100,7 @@ class Servidor:
 			apelido = con.recv(1024).decode('utf-8')
 			existe = self.verifica_apelido(apelido)
 		
-		con.send('Em qual idioma você gostaria de receber as mensagems? (PT, EN, ES):'.encode('utf-8'))
+		con.send('Em qual idioma você gostaria de receber as mensagems? (pt, en, es):'.encode('utf-8'))
 		idioma = con.recv(1024).decode('utf-8')
 		
 		print("{} conectou-se ao bate-papo LiveTranslator e fala {}.".format(apelido, idioma))
@@ -103,8 +108,7 @@ class Servidor:
 		#key: apelido. Value: (con, idioma)
 		self.clientes[apelido] = (con, idioma)		
 
-		#msg = '{} entrou no chat.'.format(apelido)
-		msg = 'Oi'
+		msg = 'Nova pessoa no chat.'
 		self.envia_mensagem_publica(apelido, msg)
 		self.recebe_mensagem(apelido, con)
         
@@ -118,7 +122,8 @@ class Servidor:
 			if apelido != remetente:
 				#Aqui deve rolar a tradução
 				msg_traduzida = self.traduz_mensagem(self.token, idm, msg)
-				# msg = msg + "[Em {}]".format(idm)
+				print('-'*7)
+				print("{} mandou mensagem pública para {}".format(remetente, apelido) )
 				self.envio_mensagem(con, msg_traduzida)
 	
 		if not self.clientes: #Servidor vai fechar e não tem ninguém conectado
@@ -234,6 +239,8 @@ class Servidor:
 		
 		#Envia mensagem privada
 		msg_traduzida = self.traduz_mensagem(self.token, idm, msg)
+		print('-'*7)
+		print("{} mandou mensagem privada para {}".format(remetente, destinatario) )
 		msg = '<' + remetente + '- Privado>: ' + msg_traduzida
 		self.envio_mensagem(con, msg)
 	
