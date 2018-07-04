@@ -3,6 +3,7 @@ import sys
 import threading
 import os
 import time
+import http.client, urllib.parse, uuid, json
 
 class Servidor:
 	'''Serve como servidor de um bate papo. Essa classe é responsável por gerenciar as mensagens que chegam dos clientes
@@ -42,6 +43,37 @@ class Servidor:
 		self.s.listen(5)
 
 
+	def traduz_mensagem(self, token, idioma, msg):
+		subscriptionKey = token
+		host = 'api.cognitive.microsofttranslator.com'
+		path = '/translate?api-version=3.0'
+		# List of supported languages: https://docs.microsoft.com/en-us/azure/cognitive-services/translator/languages
+		params = "&to=" + idioma;
+		text = msg
+
+		def translate (content):
+		    headers = {
+		        'Ocp-Apim-Subscription-Key': subscriptionKey,
+		        'Content-type': 'application/json',
+		        'X-ClientTraceId': str(uuid.uuid4())
+		    }
+		    conn = http.client.HTTPSConnection(host)
+		    conn.request ("POST", path + params, content, headers)
+		    response = conn.getresponse ()
+		    return response.read ()
+
+		requestBody = [{
+		    'Text' : text,
+		}]
+
+		content = json.dumps(requestBody, ensure_ascii=False)
+		result = translate (content) #Array de bytes
+		result = result.decode('utf8').replace("'", '"').replace("[", "").replace("]", "") # Lista com caracteres retornados tratados
+		result = json.loads(result) #Json tratado
+
+		return (result["translations"]["text"])
+		
+		
 	def aceita_conexao_clientes(self):
 		'''Aceita conexão de clientes que se conectam ao servidor'''
 		while True:
@@ -71,7 +103,8 @@ class Servidor:
 		#key: apelido. Value: (con, idioma)
 		self.clientes[apelido] = (con, idioma)		
 
-		msg = '{} entrou no bate-papo.'.format(apelido)
+		#msg = '{} entrou no chat.'.format(apelido)
+		msg = 'Oi'
 		self.envia_mensagem_publica(apelido, msg)
 		self.recebe_mensagem(apelido, con)
         
@@ -80,11 +113,13 @@ class Servidor:
 		'''Envia mensagens para todos os clientes.'''
 
 		for apelido, value in list(self.clientes.items()):
-			con, idm = value
+			con, idm = value  #Conexão do destino e idioma que o cliente fala
 			#Verifica que o usuario que irá receber a mensagem não é o mesmo que envia a mensagem.
 			if apelido != remetente:
-				msg = msg + "[Em {}]".format(idm)
-				self.envio_mensagem(con, msg)
+				#Aqui deve rolar a tradução
+				msg_traduzida = self.traduz_mensagem(self.token, idm, msg)
+				# msg = msg + "[Em {}]".format(idm)
+				self.envio_mensagem(con, msg_traduzida)
 	
 		if not self.clientes: #Servidor vai fechar e não tem ninguém conectado
 			return
@@ -198,9 +233,13 @@ class Servidor:
 			remetente = "Servidor"
 		
 		#Envia mensagem privada
-		msg = '<' + remetente + '> <Privado> ' + msg + "[Enviada em {}]".format(idm)
+		msg_traduzida = self.traduz_mensagem(self.token, idm, msg)
+		msg = '<' + remetente + '- Privado>: ' + msg_traduzida
 		self.envio_mensagem(con, msg)
-		
+	
+	
+	
+
 		
 		
 if __name__ == "__main__":
